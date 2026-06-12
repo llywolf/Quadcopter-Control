@@ -50,15 +50,15 @@ The NMPC problem is formulated as:
 \begin{aligned}
 \min_{\{u_k\}_{k=0}^{N-1}} \quad
 J =
-\sum_{k=0}^{N-1}
+&\sum_{k=0}^{N-1}
 \Big[
-(x_k - x_{\mathrm{ref},k})^T Q (x_k - x_{\mathrm{ref},k})
- +
-(u_k - u_{\mathrm{ref},k})^T R (u_k - u_{\mathrm{ref},k})
- +
+(x_k - x_{\mathrm{ref},k})^T Q (x_k - x_{\mathrm{ref},k}) \\
+&\quad +
+(u_k - u_{\mathrm{ref},k})^T R (u_k - u_{\mathrm{ref},k}) \\
+&\quad +
 (u_k - u_{k-1})^T S (u_k - u_{k-1})
-\Big]
-+
+\Big] \\
+&+
 (x_N - x_{\mathrm{ref},N})^T P (x_N - x_{\mathrm{ref},N})
 \end{aligned}
 ```
