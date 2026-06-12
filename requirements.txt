@@ -1,0 +1,7 @@
+numpy>=1.25
+scipy>=1.11
+matplotlib
+plotly
+rtree==1.2.0
+casadi
+pandas
