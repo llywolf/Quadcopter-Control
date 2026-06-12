@@ -97,20 +97,20 @@ x \in \mathcal{X}_{\mathrm{free}}
 
 where:
 
-- \(x_k\) is the predicted state at step \(k\);
-- \(x\_{\mathrm{ref},k}\) is the reference state at step \(k\);
-- \(x_N\) is the terminal predicted state;
-- \(x\_{\mathrm{ref},N}\) is the terminal reference state;
-- \(u_k\) is the control input at step \(k\);
-- \(u\_{\mathrm{ref}}\) is the hover control input;
-- \(Q\) is the state tracking weight matrix;
-- \(R\) is the input reference tracking weight matrix;
-- \(S\) is the command effort variation weight matrix;
-- \(P\) is the terminal state weight matrix;
-- \(\omega\_{\max}\) is the maximum allowed rotor speed;
-- \(\Delta u\_{\max}\) is the maximum allowed command variation between two consecutive time steps;
-- \(\phi_k\) and \(\theta_k\) are the roll and pitch angles;
-- \(\mathcal{X}\_{\mathrm{free}}\) is the obstacle-free state space.
+- `x_k` is the predicted state at step `k`;
+- `x_ref,k` is the reference state at step `k`;
+- `x_N` is the terminal predicted state;
+- `x_ref,N` is the terminal reference state;
+- `u_k` is the control input at step `k`;
+- `u_ref,k` is the reference or nominal control input at step `k`;
+- `Q` is the state tracking weight matrix;
+- `R` is the input reference tracking weight matrix;
+- `S` is the command effort variation weight matrix;
+- `P` is the terminal state weight matrix;
+- `omega_max` is the maximum allowed rotor speed;
+- `Delta u_max` is the maximum allowed command variation between two consecutive time steps;
+- `phi_k` and `theta_k` are the roll and pitch angles;
+- `X_free` is the obstacle-free state space.
 
 The command effort constraint limits how much the rotor commands are allowed to change between consecutive prediction steps. This prevents aggressive input variations and keeps the control signals smoother.
 
