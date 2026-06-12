@@ -65,48 +65,52 @@ J =
 
 subject to:
 
-$$
+subject to:
+
+```math
 \dot{x} = f(x,u)
-$$
+```
 
-$$
-x_0 = x_{\text{init}}
-$$
+```math
+x_0 = x_{\mathrm{init}}
+```
 
-$$
+```math
 0 \leq u_k \leq \omega_{\max}^2
-$$
+```
 
-$$
+```math
 -\Delta u_{\max} \leq u_k - u_{k-1} \leq \Delta u_{\max}
-$$
+```
 
-$$
+```math
 -\frac{\pi}{3} \leq \phi_k \leq \frac{\pi}{3}
-$$
+```
 
-$$
+```math
 -\frac{\pi}{3} \leq \theta_k \leq \frac{\pi}{3}
-$$
+```
 
-$$
-x \in \mathcal{X}_{\text{free}}
-$$
+```math
+x \in \mathcal{X}_{\mathrm{free}}
+```
 
 where:
 
 - \(x_k\) is the predicted state at step \(k\);
-- \(x\_{\text{ref},k}\) is the reference state;
-- \(u_k\) is the control input;
-- \(u\_{ref}\) is the hover control input;
+- \(x\_{\mathrm{ref},k}\) is the reference state at step \(k\);
+- \(x_N\) is the terminal predicted state;
+- \(x\_{\mathrm{ref},N}\) is the terminal reference state;
+- \(u_k\) is the control input at step \(k\);
+- \(u\_{\mathrm{ref}}\) is the hover control input;
 - \(Q\) is the state tracking weight matrix;
-- \(R\) is the input tracking weight matrix;
-- \(S\) is the input variation weight matrix;
+- \(R\) is the input reference tracking weight matrix;
+- \(S\) is the command effort variation weight matrix;
 - \(P\) is the terminal state weight matrix;
-- \(\omega\_{\max}\) is the maximum rotor speed;
+- \(\omega\_{\max}\) is the maximum allowed rotor speed;
 - \(\Delta u\_{\max}\) is the maximum allowed command variation between two consecutive time steps;
 - \(\phi_k\) and \(\theta_k\) are the roll and pitch angles;
-- \(\mathcal{X}\_{\text{free}}\) is the obstacle-free state space.
+- \(\mathcal{X}\_{\mathrm{free}}\) is the obstacle-free state space.
 
 The command effort constraint limits how much the rotor commands are allowed to change between consecutive prediction steps. This prevents aggressive input variations and keeps the control signals smoother.
 
