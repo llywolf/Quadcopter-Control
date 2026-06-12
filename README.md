@@ -46,15 +46,22 @@ The NMPC controller solves an optimization problem over a finite prediction hori
 
 The NMPC problem is formulated as:
 
-$$
-\min_{u} \sum_{k=0}^{N-1}
-\left[
-(x_k - x_{\text{ref},k})^T Q (x_k - x_{\text{ref},k})
-+ (u_k - u_{\text{ref}})^T R (u_k - u_{\text{ref}})
-+ (u_k - u_{k-1})^T S (u_k - u_{k-1})
-\right]
-+ (x_N - x_{\text{ref},N})^T P (x_N - x_{\text{ref},N})
-$$
+```math
+\begin{aligned}
+\min_{\{u_k\}_{k=0}^{N-1}} \quad
+J =
+\sum_{k=0}^{N-1}
+\Big[
+(x_k - x_{\mathrm{ref},k})^T Q (x_k - x_{\mathrm{ref},k})
+ +
+(u_k - u_{\mathrm{ref},k})^T R (u_k - u_{\mathrm{ref},k})
+ +
+(u_k - u_{k-1})^T S (u_k - u_{k-1})
+\Big]
++
+(x_N - x_{\mathrm{ref},N})^T P (x_N - x_{\mathrm{ref},N})
+\end{aligned}
+```
 
 subject to:
 
