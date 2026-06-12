@@ -54,7 +54,7 @@ J =
 \Big[
 (x_k - x_{\mathrm{ref},k})^T Q (x_k - x_{\mathrm{ref},k}) \\
 &\quad +
-(u_k - u_{\mathrm{ref},k})^T R (u_k - u_{\mathrm{ref},k}) \\
+(u_k - u_{\mathrm{ref}})^T R (u_k - u_{\mathrm{ref}}) \\
 &\quad +
 (u_k - u_{k-1})^T S (u_k - u_{k-1})
 \Big] \\
@@ -98,7 +98,7 @@ where:
 - \(x_k\) is the predicted state at step \(k\);
 - \(x\_{\text{ref},k}\) is the reference state;
 - \(u_k\) is the control input;
-- \(u\_{\text{ref}}\) is the hover control input;
+- \(u\_{ref}\) is the hover control input;
 - \(Q\) is the state tracking weight matrix;
 - \(R\) is the input tracking weight matrix;
 - \(S\) is the input variation weight matrix;
