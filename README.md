@@ -65,8 +65,6 @@ J =
 
 subject to:
 
-subject to:
-
 ```math
 \dot{x} = f(x,u)
 ```
