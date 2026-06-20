@@ -26,6 +26,9 @@ from trajectory_generator import (
 )
 from nmpc import FullStateNMPC
 
+from rand_position_polytopes_generation import DEFAULT_TEMPLATE_SHAPES, randomize_obstacle_positions
+from scenario_obstacles import save_obstacle_vertices
+
 # set seed for reproducibility
 np.random.seed(123456)
 
@@ -198,12 +201,17 @@ def main():
     goal = np.array([[18], [18]])
 
     base_obstacles = []
-    shapes = [
-        [[5, 5], [9, 5], [7, 10]],
-        [[12, 2], [17, 3], [16, 7], [11, 8]],
-        [[10, 14], [12, 12], [14, 12], [16, 16], [12, 16]],
-        [[3, 14], [3, 19], [6.5, 14], [6.5, 19]],
-    ]
+    shapes = randomize_obstacle_positions(
+        DEFAULT_TEMPLATE_SHAPES,
+        bounds,
+        start,
+        goal,
+        start_goal_clearance=1.0,
+        obstacle_gap=0.3,
+        seed=None,
+    )
+    
+    save_obstacle_vertices(shapes)
 
     # * Create Convex Polytopes from the defined obstacle
     for shape in shapes:
