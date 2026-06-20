@@ -157,6 +157,12 @@ python quadcopter_nmpc.py
 Runs the NMPC controller.
 
 ```bash
+python export_bspline_reference.py
+```
+
+Runs the script that stores the trajectory for the other methods
+
+```bash
 python quadcopter_backstepping.py
 ```
 
@@ -174,13 +180,12 @@ Runs the Differential Flatness PID controller.
 
 The main files used in the project are:
 
-- `quadcopter_nmpc.py` — NMPC trajectory tracking controller
-- `quadcopter_backstepping.py` — Backstepping trajectory tracking controller
-- `quadcopter_flatness.py` — Differential flatness PID controller
-- `trajectory_generator.py` — RRT and B-spline trajectory generation
-- `requirements.txt` — Required Python dependencies
-
----
+- `quadcopter_nmpc.py` - NMPC trajectory tracking controller
+- `quadcopter_backstepping.py` - Backstepping trajectory tracking controller
+- `quadcopter_flatness.py` - Differential flatness PID controller
+- `trajectory_generator.py` - RRT and B-spline trajectory generation
+- `requirements.txt` - Required Python dependencies
+- `export_bspline_reference.py` - Exports the computed trajectory to a script
 
 ## Notes
 
