@@ -28,6 +28,14 @@ from nmpc import FullStateNMPC
 
 from rand_position_polytopes_generation import DEFAULT_TEMPLATE_SHAPES, randomize_obstacle_positions
 from scenario_obstacles import save_obstacle_vertices
+from initial_obstacles import get_initial_obstacle_shapes
+import initial_reference
+
+from metrics import print_tracking_metrics
+
+# Scenario selection
+USE_RANDOM_REFERENCE = True
+USE_RANDOM_OBSTACLES = True
 
 # set seed for reproducibility
 np.random.seed(123456)
@@ -193,24 +201,49 @@ def get_ref_window(ref_trajectory, i, Npred):
 
     return X_ref_window
 
+def sample_reference_xy(reference_module, num_samples=200):
+    s_vals = np.linspace(reference_module.s_min, reference_module.s_max, num_samples)
+    xy = np.zeros((num_samples, 2))
+
+    for i, s in enumerate(s_vals):
+        pos, _ = reference_module.eval_spline_manual(s)
+        xy[i, :] = pos
+
+    return xy
 
 # main simulation
 def main():
     bounds = {"xmin": 0, "xmax": 20, "ymin": 0, "ymax": 20}
-    start = np.array([[2], [2]])
-    goal = np.array([[18], [18]])
+    bspline_traj = None
 
-    base_obstacles = []
-    shapes = randomize_obstacle_positions(
-        DEFAULT_TEMPLATE_SHAPES,
-        bounds,
-        start,
-        goal,
-        start_goal_clearance=1.0,
-        obstacle_gap=0.3,
-        seed=None,
-    )
-    
+    if USE_RANDOM_REFERENCE:
+        start = np.array([[2], [2]])
+        goal = np.array([[18], [18]])
+    else:
+        bspline_traj = sample_reference_xy(
+            initial_reference,
+            num_samples=200
+        )
+
+        start = bspline_traj[0].reshape(2, 1)
+        goal = bspline_traj[-1].reshape(2, 1)
+
+
+    if USE_RANDOM_OBSTACLES:
+        base_obstacles = []
+        shapes = randomize_obstacle_positions(
+            DEFAULT_TEMPLATE_SHAPES,
+            bounds,
+            start,
+            goal,
+            start_goal_clearance=1.0,
+            obstacle_gap=0.3,
+            seed=None,
+        )
+    else:
+        base_obstacles = []
+        shapes = get_initial_obstacle_shapes()
+        
     save_obstacle_vertices(shapes)
 
     # * Create Convex Polytopes from the defined obstacle
@@ -227,6 +260,10 @@ def main():
             obs["A"], obs["b"], obs["vertices"], inflation_radius
         )
         inflated_obstacles.append({"A": A_inf, "b": b_inf, "vertices": V_inf})
+
+    rrt = None
+    path = None
+    optimized_control_points = None
 
     # * Create Search Space for RRT with Inflated Obstacles
     dim_lengths = [(bounds["xmin"], bounds["xmax"]), (bounds["ymin"], bounds["ymax"])]
@@ -245,7 +282,6 @@ def main():
     print(">> Computing RRT Path")
     raw_path = rrt.rrt_search()
 
-    # 4. Smooth the Path
     path = raw_path
 
     if path is None:
@@ -253,26 +289,38 @@ def main():
     else:
         print(f">> Path found successfully! Waypoints reduced to: {len(path)}")
 
-    print(">> Optimizing RRT Control Points with CasADi")
-    optimized_control_points, delta = optimize_control_points(
-        path,
-        safe_radius=BSPLINE_SAFE_RADIUS,
-        degree=BSPLINE_DEGREE,
-        smooth_weight=BSPLINE_SMOOTH_WEIGHT,
-    )
-    print(f">> Optimal relaxation delta: {delta:.6f}")
-    
-    # Export the optimized B-spline as a piecewise polynomial JSON for use in other modules
-    export_bspline_as_polynomial(
-    optimized_control_points,
-    BSPLINE_DEGREE,
-    "bspline_poly.json"
-    )
 
-    print("Generating B-spline trajectory...")
-    bspline_traj = generate_bspline_trajectory(
-        optimized_control_points, degree=BSPLINE_DEGREE, num_samples=200
-    )
+    if USE_RANDOM_REFERENCE:
+        print(">> Optimizing RRT Control Points with CasADi")
+
+        optimized_control_points, delta = optimize_control_points(
+            path,
+            safe_radius=BSPLINE_SAFE_RADIUS,
+            degree=BSPLINE_DEGREE,
+            smooth_weight=BSPLINE_SMOOTH_WEIGHT,
+        )
+
+        print(f">> Optimal relaxation delta: {delta:.6f}")
+
+        export_bspline_as_polynomial(
+            optimized_control_points,
+            BSPLINE_DEGREE,
+            "bspline_poly.json"
+        )
+
+        print("Generating B-spline trajectory...")
+        bspline_traj = generate_bspline_trajectory(
+            optimized_control_points,
+            degree=BSPLINE_DEGREE,
+            num_samples=200
+        )
+
+    else:
+        print(">> Using initial_reference.py trajectory")
+        optimized_control_points = None
+        
+    if bspline_traj is None:
+        raise RuntimeError("B-spline trajectory was not initialized.")
     
     # environment plots
 
@@ -487,6 +535,9 @@ def main():
     error_history = []
     command_history = []
     
+    metric_pos_history = []
+    metric_ref_history = []
+    
     
 
     target_goal_3d = np.array([[goal[0,0]], [goal[1,0]], [-10.0]])
@@ -518,6 +569,9 @@ def main():
         
         error_history.append((p - ref_p).flatten())
         command_history.append(w_opt.flatten())
+        
+        metric_pos_history.append(p.flatten())
+        metric_ref_history.append(ref_p.flatten())
         
 
         # Visualization (uncomment for iterative 3D plot)
@@ -686,6 +740,18 @@ def main():
     axs[1, 0].set_xlabel('Time (s)')
     plt.tight_layout()
     plt.show()
+    
+    metric_pos_arr = np.array(metric_pos_history)
+    metric_ref_arr = np.array(metric_ref_history)
+
+    metrics = print_tracking_metrics(
+        "NMPC",
+        metric_pos_arr,
+        metric_ref_arr,
+        cmd_arr,
+        w_min=0.0,
+        w_max=w_max
+    )
 
 if __name__ == "__main__":
     main()
