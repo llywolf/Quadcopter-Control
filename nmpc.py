@@ -55,8 +55,8 @@ class FullStateNMPC:
         ])
 
         P_weights = np.array([
-            100, 100, 250,   # terminal x, y, z
-            50,  50,  75,    # terminal velocity
+            300, 300, 550,   # terminal x, y, z
+            150,  150,  275,    # terminal velocity
             15,   15,   10,     # terminal attitude
             1,    1,    1       # terminal angular rates
         ])

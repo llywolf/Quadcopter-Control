@@ -12,7 +12,8 @@ from initial_obstacles import load_initial_base_obstacles
 
 from reference_selector import load_reference
 
-USE_RANDOM_REFERENCE = True
+# USE_RANDOM_REFERENCE = True
+USE_RANDOM_REFERENCE = False
 
 reference = load_reference(
     use_random_reference=USE_RANDOM_REFERENCE
@@ -23,7 +24,8 @@ s_max = reference.s_max
 eval_spline_manual = reference.eval_spline_manual
 sample_reference_curve = reference.sample_reference_curve
 
-USE_RANDOM_OBSTACLES = True
+# USE_RANDOM_OBSTACLES = True
+USE_RANDOM_OBSTACLES = False
 
 if USE_RANDOM_OBSTACLES:
     base_obstacles = load_base_obstacles()
@@ -63,6 +65,9 @@ class QuadcopterParams:
         return np.diag([self.Jx, self.Jy, self.Jz])
     
     
+def wrap_to_pi(angle):
+    return (angle + np.pi) % (2.0 * np.pi) - np.pi
+    
 # attitude controller
 
 def attitude_controller(ref, angles, angle_rates, Kp, Kd):
@@ -95,6 +100,7 @@ def attitude_controller(ref, angles, angle_rates, Kp, Kd):
     eta_ddot_d = ref[6:9]
 
     e_eta = eta_d - angles
+    e_eta[2] = wrap_to_pi(e_eta[2])
     e_eta_dot = eta_dot_d - angle_rates
 
     sigma = eta_ddot_d + Kd @ e_eta_dot + Kp @ e_eta
@@ -169,6 +175,8 @@ def low_level_attitude_control(ref, angles, angle_rates, Kp_att, Kd_att, params)
         angle_rates=angle_rates,
         params=params
     )
+    
+    tau = np.clip(tau, -MAX_TAU, MAX_TAU)
 
     return tau, sigma
 
@@ -240,17 +248,25 @@ def position_mapping(virtual_input, psi, params):
     m = params.m
     g = params.g
 
-    T = m * np.sqrt(u1**2 + u2**2 + (u3 + g)**2)
+    T_raw = m * np.sqrt(u1**2 + u2**2 + (u3 + g)**2)
 
-    # Protect asin from numerical errors slightly outside [-1, 1]
-    asin_arg = (u1 * np.sin(psi) - u2 * np.cos(psi)) * m / T
+    asin_arg = (u1 * np.sin(psi) - u2 * np.cos(psi)) * m / max(T_raw, 1e-9)
     asin_arg = np.clip(asin_arg, -1.0, 1.0)
 
     phi_d = np.arcsin(asin_arg)
 
-    theta_d = np.arctan(
-        (u1 * np.cos(psi) + u2 * np.sin(psi)) / (u3 + g)
+    theta_d = np.arctan2(
+        u1 * np.cos(psi) + u2 * np.sin(psi),
+        u3 + g
     )
+
+    phi_d = np.clip(phi_d, -MAX_TILT, MAX_TILT)
+    theta_d = np.clip(theta_d, -MAX_TILT, MAX_TILT)
+
+    T_min = MIN_THRUST_FACTOR * m * g
+    T_max = MAX_THRUST_FACTOR * m * g
+
+    T = np.clip(T_raw, T_min, T_max)
 
     control_angles = np.array([phi_d, theta_d], dtype=float)
 
@@ -261,7 +277,7 @@ def position_mapping(virtual_input, psi, params):
 
 def high_level_position_control(ref, position, velocity, angles, Kp_pos, Kd_pos, params):
     """
-    Complete high-level controller.
+    High-level controller.
 
     Inputs:
         ref:
@@ -428,7 +444,7 @@ def rotation_acceleration(tau, angles, angle_rates, params):
 
 def quadcopter_dynamics(t, state, control_input, params):
     """
-    Full continuous-time quadcopter model.
+    Quadcopter model
 
     State vector:
         state = [
@@ -496,32 +512,69 @@ def rk4_step(f, t, state, dt, control_input, params):
 
 
 B_SPLINE_T_FINAL = 30.0
+HOVER_TIME = 3.0
+PATH_TIME = B_SPLINE_T_FINAL - HOVER_TIME
 B_SPLINE_EPS = 1e-4
 
+MAX_TILT = np.deg2rad(25.0)
+MAX_THRUST_FACTOR = 2.2
+MIN_THRUST_FACTOR = 0.2
 
-def s_from_time(t):
-    return np.clip(t / B_SPLINE_T_FINAL, s_min, s_max)
+MAX_TAU = np.array([0.35, 0.35, 0.20])
+
+
+def smooth_progress(t):
+    """
+    Smooth progress from 0 to 1.
+
+    s_dot = 0 at start and end
+    s_ddot = 0 at start and end
+    Prevents sudden acceleration near the goal.
+    """
+
+    r = np.clip(t / PATH_TIME, 0.0, 1.0)
+
+    s = 10.0*r**3 - 15.0*r**4 + 6.0*r**5
+    dsdt = (30.0*r**2 - 60.0*r**3 + 30.0*r**4) / PATH_TIME
+    d2sdt2 = (60.0*r - 180.0*r**2 + 120.0*r**3) / PATH_TIME**2
+
+    return s, dsdt, d2sdt2
+
+
+def final_goal_position():
+    xy_goal, _ = eval_spline_manual(s_max)
+
+    return np.array([
+        xy_goal[0],
+        xy_goal[1],
+        ZD
+    ], dtype=float)
+
+
+def hover_reference():
+    goal_pos = final_goal_position()
+
+    vel_ref = np.zeros(3)
+    acc_ref = np.zeros(3)
+
+    return np.hstack((goal_pos, vel_ref, acc_ref))
 
 # control system simulation
 
 def reference_trajectory(t):
     """
-    B-spline reference for the high-level position controller.
-
-    Returns:
-    [
-        x_ref, y_ref, z_ref,
-        x_dot_ref, y_dot_ref, z_dot_ref,
-        x_ddot_ref, y_ddot_ref, z_ddot_ref
-    ]
+    B-spline reference followed during PATH_TIME seconds.
+    Last HOVER_TIME seconds are a hover reference:
+    fixed position, zero velocity, zero acceleration.
     """
 
-    s = s_from_time(t)
-    dsdt = 1.0 / B_SPLINE_T_FINAL
+    if t >= PATH_TIME:
+        return hover_reference()
+
+    s, dsdt, d2sdt2 = smooth_progress(t)
 
     xy, dxy_ds = eval_spline_manual(s)
 
-    # Numerical second derivative with respect to s
     s_plus = min(s + B_SPLINE_EPS, s_max)
     s_minus = max(s - B_SPLINE_EPS, s_min)
 
@@ -546,8 +599,8 @@ def reference_trajectory(t):
     ])
 
     acc_ref = np.array([
-        d2xy_ds2[0] * dsdt**2,
-        d2xy_ds2[1] * dsdt**2,
+        d2xy_ds2[0] * dsdt**2 + dxy_ds[0] * d2sdt2,
+        d2xy_ds2[1] * dsdt**2 + dxy_ds[1] * d2sdt2,
         0.0
     ])
 
@@ -566,19 +619,37 @@ def reference_trajectory(t):
     # return ref_pos
 
 
+def yaw_from_path(s):
+    ds = 5e-3
+
+    s_a = max(s - ds, s_min)
+    s_b = min(s + ds, s_max)
+
+    p_a, _ = eval_spline_manual(s_a)
+    p_b, _ = eval_spline_manual(s_b)
+
+    direction = p_b - p_a
+
+    if np.linalg.norm(direction) < 1e-8:
+        return 0.0
+
+    return np.arctan2(direction[1], direction[0])
+
+
 def yaw_reference(t):
     """
-    Desired yaw generated from the B-spline tangent.
+    Desired yaw generated from path direction.
 
+    During hover,  yaw is constant.
     """
 
-    s = s_from_time(t)
-    _, dxy_ds = eval_spline_manual(s)
+    if t >= PATH_TIME:
+        s = max(s_max - 5e-3, s_min)
+    else:
+        s, _, _ = smooth_progress(t)
 
-    psi_d = np.arctan2(dxy_ds[1], dxy_ds[0])
+    psi_d = yaw_from_path(s)
 
-    # Keep yaw derivatives zero for now.
-    # This is safer unless you specifically want aggressive yaw tracking.
     psi_dot_d = 0.0
     psi_ddot_d = 0.0
 
@@ -714,15 +785,15 @@ def simulate_complete_control_system():
     # Position controller gains
     # These act on:
     # x_ddot = v1, y_ddot = v2, z_ddot = v3
-    Kp_pos = np.array([0.8, 0.8, 0.8]) * 5
-    Kd_pos = np.array([1, 1, 1]) * 5
+    Kp_pos = np.array([0.8, 0.8, 0.8]) * 3.5 # 5
+    Kd_pos = np.array([1, 1, 1]) * 3.5 # 5
 
     # Attitude controller gains
     # These act on:
     # phi_ddot = sigma1, theta_ddot = sigma2, psi_ddot = sigma3
     # Attitude loop should be faster than position loop.
-    Kp_att = np.array([40.0, 40.0, 40.0])
-    Kd_att = np.array([20.0, 20.0, 20.0])
+    Kp_att = np.array([10.0, 10.0, 10.0]) * 100 # 50
+    Kd_att = np.array([10.0, 10.0, 10.0]) * 20 # 10
 
     for k, t in enumerate(time):
         position = state[0:3]
@@ -935,7 +1006,7 @@ def plot_complete_control_results(time, states, inputs, refs_pos, refs_att, virt
     ax.set_xlabel("x [m]")
     ax.set_ylabel("y [m]")
     ax.set_zlabel("z [m]")
-    ax.set_title("3D position tracking")
+    ax.set_title("Flatness PID controller")
     ax.legend()
     ax.grid(True)
     

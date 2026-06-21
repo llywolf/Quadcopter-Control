@@ -7,7 +7,8 @@ from initial_obstacles import load_initial_base_obstacles
 
 from reference_selector import load_reference
 
-USE_RANDOM_REFERENCE = True
+# USE_RANDOM_REFERENCE = True
+USE_RANDOM_REFERENCE = False
 
 reference = load_reference(
     use_random_reference=USE_RANDOM_REFERENCE
@@ -18,7 +19,8 @@ s_max = reference.s_max
 eval_spline_manual = reference.eval_spline_manual
 sample_reference_curve = reference.sample_reference_curve
 
-USE_RANDOM_OBSTACLES = True
+# USE_RANDOM_OBSTACLES = True
+USE_RANDOM_OBSTACLES = False
 
 if USE_RANDOM_OBSTACLES:
     base_obstacles = load_base_obstacles()

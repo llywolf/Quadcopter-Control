@@ -34,8 +34,10 @@ import initial_reference
 from metrics import print_tracking_metrics
 
 # Scenario selection
-USE_RANDOM_REFERENCE = True
-USE_RANDOM_OBSTACLES = True
+# USE_RANDOM_REFERENCE = True
+# USE_RANDOM_OBSTACLES = True
+USE_RANDOM_REFERENCE = False
+USE_RANDOM_OBSTACLES = False
 
 # set seed for reproducibility
 np.random.seed(123456)
@@ -540,9 +542,26 @@ def main():
     
     
 
-    target_goal_3d = np.array([[goal[0,0]], [goal[1,0]], [-10.0]])
+    target_goal_3d = np.array([[goal[0, 0]], [goal[1, 0]], [-10.0]])
+
+    GOAL_RADIUS = 0.4
+    HOVER_AFTER_GOAL_TIME = 4.0
+    HOVER_AFTER_GOAL_STEPS = int(HOVER_AFTER_GOAL_TIME / dt_nmpc)
+
+    goal_reached = False
+    hover_counter = 0
+
+    # Explicit hover reference for NMPC after reaching the goal
+    goal_hover_ref = np.zeros((12, Npred + 1))
+    goal_hover_ref[0, :] = goal[0, 0]
+    goal_hover_ref[1, :] = goal[1, 0]
+    goal_hover_ref[2, :] = -10.0
+    goal_hover_ref[3:6, :] = 0.0
+    goal_hover_ref[6:12, :] = 0.0
+
     i = 0
-    while np.linalg.norm(p - target_goal_3d) > 0.4:
+
+    while True:
         
         phi, theta, psi = rl.eulermat2angles(R)
         v_world = R @ vr
@@ -553,7 +572,17 @@ def main():
             phi, theta, psi, omega_body[0], omega_body[1], omega_body[2]
         ])
         
-        X_ref_window = get_ref_window(ref_trajectory, i, Npred)
+        distance_to_goal = np.linalg.norm(p - target_goal_3d)
+
+        if (not goal_reached) and distance_to_goal <= GOAL_RADIUS:
+            goal_reached = True
+            hover_counter = 0
+            print(f">> Goal reached at t = {i * dt_nmpc:.2f} s. Switching NMPC reference to hover.")
+
+        if goal_reached:
+            X_ref_window = goal_hover_ref
+        else:
+            X_ref_window = get_ref_window(ref_trajectory, i, Npred)
         
         w_opt = nmpc.get_control(current_state, X_ref_window)
 
@@ -564,8 +593,11 @@ def main():
             
         #Record data for analysis
         time_history.append(i * dt_nmpc)
-        ref_idx = min(i, ref_trajectory.shape[1] - 1)
-        ref_p = ref_trajectory[0:3, ref_idx].reshape(3, 1)
+        if goal_reached:
+            ref_p = target_goal_3d
+        else:
+            ref_idx = min(i, ref_trajectory.shape[1] - 1)
+            ref_p = ref_trajectory[0:3, ref_idx].reshape(3, 1)
         
         error_history.append((p - ref_p).flatten())
         command_history.append(w_opt.flatten())
@@ -604,6 +636,12 @@ def main():
         ax3d.set_zlabel('-Z (Altitude) [m]')
         
         rl.pause(0.1)
+
+        if goal_reached:
+            hover_counter += 1
+            if hover_counter >= HOVER_AFTER_GOAL_STEPS:
+                break
+
         i += 1
 
     print(">> Tracking Complete! Goal Reached.")
