@@ -516,7 +516,7 @@ def main():
     wr = np.zeros((3, 1))
     alpha_rotors = np.zeros((4, 1))
 
-    w_max = 700.0 # 10 for old params
+    w_max = 907.0 # 10 for old params
     # Initialize Full-State NMPC
     nmpc = FullStateNMPC(dt=dt_nmpc, Npred=Npred, m=m, g=g, obstacles=inflated_obstacles, B_mat=B_mat, I_mat=I, w_max = w_max)
     
