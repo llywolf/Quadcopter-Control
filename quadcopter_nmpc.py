@@ -25,6 +25,9 @@ from trajectory_generator import (
     PolytopeSearchSpace,
 )
 from nmpc import FullStateNMPC
+import time
+import csv
+import numpy as np
 
 from rand_position_polytopes_generation import DEFAULT_TEMPLATE_SHAPES, randomize_obstacle_positions
 from scenario_obstacles import save_obstacle_vertices
@@ -560,6 +563,9 @@ def main():
     goal_hover_ref[6:12, :] = 0.0
 
     i = 0
+    
+    
+    control_times = []
 
     while True:
         
@@ -584,7 +590,9 @@ def main():
         else:
             X_ref_window = get_ref_window(ref_trajectory, i, Npred)
         
+        t0 = time.perf_counter()
         w_opt = nmpc.get_control(current_state, X_ref_window)
+        control_times.append(time.perf_counter() - t0)
 
         for _ in range(steps_per_nmpc):
             p, R, vr, wr = clock_quadri_rk2(p, R, vr, wr, w_opt, B_mat, I, g, m, dt_phys)
@@ -790,6 +798,18 @@ def main():
         w_min=0.0,
         w_max=w_max
     )
+    control_times = np.array(control_times)
+
+    mean_time_ms = np.mean(control_times) * 1000
+    max_time_ms = np.max(control_times) * 1000
+    min_time_ms = np.min(control_times) * 1000
+    total_control_time_s = np.sum(control_times)
+
+    print("\nComputation time results:")
+    print(f"Mean time per call: {mean_time_ms:.4f} ms")
+    print(f"Max time per call: {max_time_ms:.4f} ms")
+    print(f"Min time per call: {min_time_ms:.4f} ms")
+    print(f"Total computation time: {total_control_time_s:.4f} s")
 
 if __name__ == "__main__":
     main()

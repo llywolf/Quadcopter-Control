@@ -1,4 +1,7 @@
 from roblib import *  # Ensure this is in your Python path or in the same directory
+import time
+import csv
+import numpy as np
 
 from metrics import print_tracking_metrics
 
@@ -46,6 +49,7 @@ error_history = []
 command_history = []
 ref_history = []
 ref_time_history = []
+control_times = []
 
 def draw_reference_and_actual(ax, path):
     ax.plot(
@@ -394,7 +398,10 @@ U_MAX = 900.0       # optional signed command magnitude limit
 # Simulation loop - no plotting inside
 for k,t in enumerate(time_ref):
     X = hstack((p.flatten(), eulermat2angles(R), vr.flatten(), wr.flatten())).reshape(-1, 1)
+    
+    t0 = time.perf_counter()
     w_cmd = control(X)
+    control_times.append(time.perf_counter() - t0)
 
     if w_prev is None:
         w = w_cmd.copy()
@@ -511,3 +518,15 @@ tight_layout()
 show()
 
 metrics = print_tracking_metrics("Backstepping", path, ref_history, cmd_arr)
+control_times = np.array(control_times)
+
+mean_time_ms = np.mean(control_times) * 1000
+max_time_ms = np.max(control_times) * 1000
+min_time_ms = np.min(control_times) * 1000
+total_control_time_s = np.sum(control_times)
+
+print("\nComputation time results:")
+print(f"Mean time per call: {mean_time_ms:.4f} ms")
+print(f"Max time per call: {max_time_ms:.4f} ms")
+print(f"Min time per call: {min_time_ms:.4f} ms")
+print(f"Total computation time: {total_control_time_s:.4f} s")

@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
 from scipy.io import loadmat
+import time as timer
+import csv
+import numpy as np
 
 from roblib import clean3D
 
@@ -774,6 +777,7 @@ def simulate_complete_control_system():
 
     virtual_inputs = np.zeros((len(time), 3))
     sigmas = np.zeros((len(time), 3))
+    control_times = []
     
      # initial position
     initial_ref = reference_trajectory(0.0)
@@ -805,6 +809,7 @@ def simulate_complete_control_system():
 
         ref_pos = reference_trajectory(t)
 
+        t0 = timer.perf_counter()
         T, control_angles, virtual_input = high_level_position_control(
             ref=ref_pos,
             position=position,
@@ -849,6 +854,7 @@ def simulate_complete_control_system():
             tau[1],
             tau[2]
         ])
+        control_times.append(timer.perf_counter() - t0)
 
         # Save data
         states[k, :] = state
@@ -869,7 +875,7 @@ def simulate_complete_control_system():
             params
         )
 
-    return time, states, inputs, refs_pos, refs_att, virtual_inputs, sigmas, motor_commands
+    return time, states, inputs, refs_pos, refs_att, virtual_inputs, sigmas, motor_commands, control_times
 
 
 # Plot complete control system results
@@ -1109,7 +1115,7 @@ def plot_complete_control_results(time, states, inputs, refs_pos, refs_att, virt
     plt.show()
 
 if __name__ == "__main__":
-    time, states, inputs, refs_pos, refs_att, virtual_inputs, sigmas, motor_commands = simulate_complete_control_system()
+    time, states, inputs, refs_pos, refs_att, virtual_inputs, sigmas, motor_commands, control_times = simulate_complete_control_system()
 
     plot_complete_control_results(
         time,
@@ -1123,3 +1129,15 @@ if __name__ == "__main__":
     )
     
     metrics = print_tracking_metrics("Flatness", states[:, 0:3], refs_pos[:, 0:3], motor_commands)
+    control_times = np.array(control_times)
+
+    mean_time_ms = np.mean(control_times) * 1000
+    max_time_ms = np.max(control_times) * 1000
+    min_time_ms = np.min(control_times) * 1000
+    total_control_time_s = np.sum(control_times)
+
+    print("\nComputation time results:")
+    print(f"Mean time per call: {mean_time_ms:.4f} ms")
+    print(f"Max time per call: {max_time_ms:.4f} ms")
+    print(f"Min time per call: {min_time_ms:.4f} ms")
+    print(f"Total computation time: {total_control_time_s:.4f} s")
